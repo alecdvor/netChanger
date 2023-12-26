@@ -4,14 +4,14 @@ Add-Type -AssemblyName System.Windows.Forms
 # Create form
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "netChanger"
-$form.Size = New-Object System.Drawing.Size(700, 340)  # Increased height
+$form.Size = New-Object System.Drawing.Size(700, 370)  # Increased height
 $form.StartPosition = "CenterScreen"
 
 # Create controls
 $btnRefresh = New-Object System.Windows.Forms.Button
 $btnRefresh.Text = "Refresh"
 $btnRefresh.Location = New-Object System.Drawing.Point(10, 10)
-$btnRefresh.Size = New-Object System.Drawing.Size(240, 30)
+$btnRefresh.Size = New-Object System.Drawing.Size(100, 30)
 $btnRefresh.Add_Click({
     Refresh-NetworkInterface
 })
@@ -29,18 +29,27 @@ $textBoxInfo.Size = New-Object System.Drawing.Size(420, 200)
 $textBoxInfo.Multiline = $true
 $textBoxInfo.ReadOnly = $true
 
-$btnCaptureCurrentIPv4 = New-Object System.Windows.Forms.Button
-$btnCaptureCurrentIPv4.Text = "Capture Current IPv4"
-$btnCaptureCurrentIPv4.Location = New-Object System.Drawing.Point(10, 260)
-$btnCaptureCurrentIPv4.Size = New-Object System.Drawing.Size(240, 30)
-$btnCaptureCurrentIPv4.Add_Click({
+$btnCaptureIP = New-Object System.Windows.Forms.Button
+$btnCaptureIP.Text = "Capture IP"
+$btnCaptureIP.Location = New-Object System.Drawing.Point(10, 260)
+$btnCaptureIP.Size = New-Object System.Drawing.Size(100, 30)
+$btnCaptureIP.Add_Click({
     Capture-Current-IPv4
+})
+
+# Add editable text field linked to the captured IP variable
+$textBoxCapturedIP = New-Object System.Windows.Forms.TextBox
+$textBoxCapturedIP.Location = New-Object System.Drawing.Point(120, 260)
+$textBoxCapturedIP.Size = New-Object System.Drawing.Size(120, 30)
+$textBoxCapturedIP.Add_TextChanged({
+    $CapturedIPs[$listBoxInterfaces.SelectedItem] = $textBoxCapturedIP.Text
+    $btnCaptureIPtoSet.Text = "Set IP to $($textBoxCapturedIP.Text)"
 })
 
 $btnCaptureIPtoSet = New-Object System.Windows.Forms.Button
 $btnCaptureIPtoSet.Text = "Capture to Set"
-$btnCaptureIPtoSet.Location = New-Object System.Drawing.Point(260, 260)
-$btnCaptureIPtoSet.Size = New-Object System.Drawing.Size(420, 30)  # Adjusted width
+$btnCaptureIPtoSet.Location = New-Object System.Drawing.Point(250, 260)
+$btnCaptureIPtoSet.Size = New-Object System.Drawing.Size(430, 30)  # Adjusted width
 $btnCaptureIPtoSet.Enabled = $false
 $btnCaptureIPtoSet.Add_Click({
     Set-Captured-IP
@@ -60,6 +69,7 @@ $btnSetLinkLocal.Size = New-Object System.Drawing.Size(670, 30)  # Adjusted widt
 $btnSetLinkLocal.Add_Click({
     Set-LinkLocal-IP
 })
+
 # Function to set the DHCP and Link Local IP for the selected interface
 function Set-DHCP-LinkLocal-IP {
     $selectedInterface = $listBoxInterfaces.SelectedItem
@@ -103,23 +113,27 @@ function Get-SelectedInterfaceInfo {
 
         $infoText = "Interface: $($interfaceInfo.InterfaceAlias)`r`n"
         $infoText += "Status: $($interfaceInfo.Status)`r`n"
-        
+
         # Retrieve IPv4 and IPv6 addresses using Get-NetIPAddress
         $ipv4Addresses = (Get-NetIPAddress -InterfaceAlias $selectedInterface -AddressFamily IPv4).IPAddress
         $ipv4SubnetMask = (Get-NetIPAddress -InterfaceAlias $selectedInterface -AddressFamily IPv4).PrefixLength
-        
+
         $ipv6Addresses = (Get-NetIPAddress -InterfaceAlias $selectedInterface -AddressFamily IPv6).IPAddress
-        
+
         $infoText += "IPv4 Addresses: $($ipv4Addresses -join ', ')`r`n"
         $infoText += "IPv4 Subnet Mask: $ipv4SubnetMask`r`n"
         $infoText += "IPv6 Addresses: $($ipv6Addresses -join ', ')`r`n"
-        
+
         # Check internet connection status
         $internetConnection = Test-Connection -ComputerName "www.google.com" -Count 2 -Quiet
         $internetStatus = if ($internetConnection) { "Connected" } else { "Disconnected" }
         $infoText += "Internet Connection: $internetStatus`r`n"
-        
-        $infoText += "MAC Address: $($interfaceInfo.MacAddress)"
+
+        $infoText += "MAC Address: $($interfaceInfo.MacAddress)`r`n"
+
+        # Retrieve VLAN ID
+        $vlanId = $interfaceInfo | Get-NetAdapterVlan | Select-Object -ExpandProperty VlanID
+        $infoText += "VLAN ID: $vlanId`r`n"
 
         $textBoxInfo.Text = $infoText
 
@@ -129,8 +143,10 @@ function Get-SelectedInterfaceInfo {
         # Set the text of the "Capture to Set" button to display the captured IP
         if ($CapturedIPs.ContainsKey($selectedInterface)) {
             $btnCaptureIPtoSet.Text = "Set IP to $($CapturedIPs[$selectedInterface])"
+            $textBoxCapturedIP.Text = $CapturedIPs[$selectedInterface]
         } else {
             $btnCaptureIPtoSet.Text = "Capture to Set"
+            $textBoxCapturedIP.Text = ""
         }
     }
 }
@@ -147,7 +163,8 @@ function Capture-Current-IPv4 {
         $CapturedIPs[$selectedInterface] = $currentIPv4
 
         # Update the label of the "Capture to Set" button
-        $btnCaptureIPtoSet.Text = "Set IP to $currentIPv4"
+        $btnCaptureIPtoSet.Text = "Set IP to $($currentIPv4)"
+        $textBoxCapturedIP.Text = $currentIPv4
     }
 }
 
@@ -190,7 +207,7 @@ function Set-LinkLocal-IP {
 
         # Refresh the displayed information after setting the Link Local IP
         Get-SelectedInterfaceInfo
-		    }
+    }
 }
 # Function to set a random Link Local IPv4 address for the selected interface
 function Set-RandomLinkLocal-IP {
@@ -223,7 +240,8 @@ $CapturedIPs = @{}
 $form.Controls.Add($btnRefresh)
 $form.Controls.Add($listBoxInterfaces)
 $form.Controls.Add($textBoxInfo)
-$form.Controls.Add($btnCaptureCurrentIPv4)
+$form.Controls.Add($btnCaptureIP)
+$form.Controls.Add($textBoxCapturedIP)
 $form.Controls.Add($btnCaptureIPtoSet)
 $form.Controls.Add($btnSetLinkLocal)
 $form.Controls.Add($btnSetDhcpLinkLocal)
