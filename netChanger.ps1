@@ -3,7 +3,7 @@ Add-Type -AssemblyName System.Windows.Forms
 
 # Create form
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "Network Interface Information"
+$form.Text = "netChanger"
 $form.Size = New-Object System.Drawing.Size(700, 340)  # Increased height
 $form.StartPosition = "CenterScreen"
 
