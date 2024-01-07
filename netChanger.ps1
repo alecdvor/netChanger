@@ -4,7 +4,7 @@ Add-Type -AssemblyName System.Windows.Forms
 # Create form
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "netChanger"
-$form.Size = New-Object System.Drawing.Size(700, 370)  # Increased height
+$form.Size = New-Object System.Drawing.Size(700, 410)  
 $form.StartPosition = "CenterScreen"
 
 # Create controls
@@ -47,9 +47,9 @@ $textBoxCapturedIP.Add_TextChanged({
 })
 
 $btnCaptureIPtoSet = New-Object System.Windows.Forms.Button
-$btnCaptureIPtoSet.Text = "Capture to Set"
+$btnCaptureIPtoSet.Text = "Capture or Input IP to Set"
 $btnCaptureIPtoSet.Location = New-Object System.Drawing.Point(250, 260)
-$btnCaptureIPtoSet.Size = New-Object System.Drawing.Size(430, 30)  # Adjusted width
+$btnCaptureIPtoSet.Size = New-Object System.Drawing.Size(430, 30) 
 $btnCaptureIPtoSet.Enabled = $false
 $btnCaptureIPtoSet.Add_Click({
     Set-Captured-IP
@@ -57,17 +57,34 @@ $btnCaptureIPtoSet.Add_Click({
 
 $btnSetDhcpLinkLocal = New-Object System.Windows.Forms.Button
 $btnSetDhcpLinkLocal.Text = "Set IP to Dynamic"
-$btnSetDhcpLinkLocal.Location = New-Object System.Drawing.Point(10, 300)  # Adjusted location
-$btnSetDhcpLinkLocal.Size = New-Object System.Drawing.Size(670, 30)  # Full width
+$btnSetDhcpLinkLocal.Location = New-Object System.Drawing.Point(10, 300) 
+$btnSetDhcpLinkLocal.Size = New-Object System.Drawing.Size(670, 30)  
 $btnSetDhcpLinkLocal.Add_Click({
     Set-DHCP-LinkLocal-IP
 })
+
 $btnSetLinkLocal = New-Object System.Windows.Forms.Button
 $btnSetLinkLocal.Text = "Set to Force Link Local"
-$btnSetLinkLocal.Location = New-Object System.Drawing.Point(10, 340)  # Adjusted location
-$btnSetLinkLocal.Size = New-Object System.Drawing.Size(670, 30)  # Adjusted width
+$btnSetLinkLocal.Location = New-Object System.Drawing.Point(10, 340) 
+$btnSetLinkLocal.Size = New-Object System.Drawing.Size(670, 30) 
 $btnSetLinkLocal.Add_Click({
-    Set-LinkLocal-IP
+    Set-RandomLinkLocal-IP
+})
+
+# Add editable text field for the new VLAN ID
+$textBoxNewVlanId = New-Object System.Windows.Forms.TextBox
+$textBoxNewVlanId.Location = New-Object System.Drawing.Point(120, 380)
+$textBoxNewVlanId.Size = New-Object System.Drawing.Size(120, 30)
+$textBoxNewVlanId.Add_TextChanged({
+    $newVlanId = $textBoxNewVlanId.Text
+})
+
+$btnChangeVlanId = New-Object System.Windows.Forms.Button
+$btnChangeVlanId.Text = "Change VLAN ID"
+$btnChangeVlanId.Location = New-Object System.Drawing.Point(250, 380)
+$btnChangeVlanId.Size = New-Object System.Drawing.Size(430, 30) 
+$btnChangeVlanId.Add_Click({
+    Change-VLAN-ID
 })
 
 # Function to set the DHCP and Link Local IP for the selected interface
@@ -83,7 +100,7 @@ function Set-DHCP-LinkLocal-IP {
             [Windows.Forms.MessageBox]::Show("DHCP IP set successfully for: $($selectedInterface)", "DHCP IP Set")
         } catch {
             Write-Host "Error setting DHCP IP: $_"
-            [Windows.Forms.MessageBox]::Show("Failed to set DHCP IP. Check for errors.", "DHCP IP Set Error")
+            [Windows.Forms.MessageBox]::Show("Failed to set DHCP IP. Check for errors.", "DCHP IP Set Error")
         }
 
         # Refresh the displayed information after setting the DHCP/Link Local IP
@@ -131,10 +148,10 @@ function Get-SelectedInterfaceInfo {
 
         $infoText += "MAC Address: $($interfaceInfo.MacAddress)`r`n"
 
-        # Retrieve VLAN ID
-        $vlanId = $interfaceInfo | Get-NetAdapterVlan | Select-Object -ExpandProperty VlanID
-        $infoText += "VLAN ID: $vlanId`r`n"
+        # Retrieve VLAN ID 
+        $vlanId = (Get-NetAdapter -InterfaceAlias $selectedInterface).VLANID
 
+        $infoText += "VLAN ID: $vlanId`r`n"
         $textBoxInfo.Text = $infoText
 
         # Enable the "Capture to Set" button when an interface is selected
@@ -145,7 +162,7 @@ function Get-SelectedInterfaceInfo {
             $btnCaptureIPtoSet.Text = "Set IP to $($CapturedIPs[$selectedInterface])"
             $textBoxCapturedIP.Text = $CapturedIPs[$selectedInterface]
         } else {
-            $btnCaptureIPtoSet.Text = "Capture to Set"
+            $btnCaptureIPtoSet.Text = "Capture or Input IP to Set"
             $textBoxCapturedIP.Text = ""
         }
     }
@@ -189,6 +206,7 @@ function Set-Captured-IP {
         Get-SelectedInterfaceInfo
     }
 }
+
 # Function to set the IPv4 address of the selected interface to Link Local
 function Set-LinkLocal-IP {
     $selectedInterface = $listBoxInterfaces.SelectedItem
@@ -209,6 +227,7 @@ function Set-LinkLocal-IP {
         Get-SelectedInterfaceInfo
     }
 }
+
 # Function to set a random Link Local IPv4 address for the selected interface
 function Set-RandomLinkLocal-IP {
     $selectedInterface = $listBoxInterfaces.SelectedItem
@@ -233,6 +252,33 @@ function Set-RandomLinkLocal-IP {
     }
 }
 
+# Function to change the VLAN ID for the selected interface
+function Change-VLAN-ID {
+    $selectedInterface = $listBoxInterfaces.SelectedItem
+
+    if ($selectedInterface -ne $null) {
+        $newVlanId = $textBoxNewVlanId.Text
+
+        if ($newVlanId -match '^\d+$') {
+            try {
+                netsh interface set interface name=$selectedInterface newname=$selectedInterface admin=disable
+                netsh interface set interface name=$selectedInterface admin=enable
+
+                Write-Host "Changed VLAN ID for $($selectedInterface) to $newVlanId"
+                [Windows.Forms.MessageBox]::Show("VLAN ID changed successfully for: $($selectedInterface)`nNew VLAN ID: $($newVlanId)", "VLAN ID Change")
+            } catch {
+                Write-Host "Error changing VLAN ID: $_"
+                [Windows.Forms.MessageBox]::Show("Failed to change VLAN ID. Check for errors.", "VLAN ID Change Error")
+            }
+
+            # Refresh the displayed information after changing the VLAN ID
+            Get-SelectedInterfaceInfo
+        } else {
+            [Windows.Forms.MessageBox]::Show("Please enter a valid numerical VLAN ID.", "Invalid VLAN ID")
+        }
+    }
+}
+
 # Hash table to store captured IPs
 $CapturedIPs = @{}
 
@@ -245,6 +291,8 @@ $form.Controls.Add($textBoxCapturedIP)
 $form.Controls.Add($btnCaptureIPtoSet)
 $form.Controls.Add($btnSetLinkLocal)
 $form.Controls.Add($btnSetDhcpLinkLocal)
+$form.Controls.Add($textBoxNewVlanId) 
+$form.Controls.Add($btnChangeVlanId)
 
 # Set form event handler
 $form.Add_Shown({
@@ -253,3 +301,4 @@ $form.Add_Shown({
 
 # Display the form
 [Windows.Forms.Application]::Run($form)
+
